@@ -81,7 +81,7 @@ void _removeBackgroundSign(char* cmd_line) {
 void ChPromptCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     if(arguments.size() == 1){
-        smash.changePromptName();
+        smash.changePromptName("smash");
     }else if(arguments.size() == 2){
         smash.changePromptName(arguments[1]);
     }else{
@@ -101,6 +101,7 @@ void GetCurrDirCommand::execute() {
 
 void ChangeDirCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
+    string prev = get_current_dir_name();
     if(arguments.size() == 2){
 
         if(arguments[1] == "-"){ //(cd -) command
@@ -111,14 +112,15 @@ void ChangeDirCommand::execute() {
                 //TODO ERROR HANDLING
                 return;
             }
-            smash.setLastPWD(get_current_dir_name());
+            smash.setLastPWD(prev);
         }else{ // cd (path) command
+
             int res = chdir(arguments[1].c_str());
             if(res == -1){
                 //TODO ERROR HANDLING
                 return;
             }
-            smash.setLastPWD(get_current_dir_name());
+            smash.setLastPWD(prev);
         }
     }else{
         cout<<"smash error: cd: too many arguments"<<endl;
@@ -126,9 +128,9 @@ void ChangeDirCommand::execute() {
 }
 
 //JobList
-void JobsList::addJob(Command *cmd, bool isStopped) {
-
-    JobEntry new_job(cmd,isStopped ? BACKGROUND : STOPPED);
+void JobsList::addJob(Command *cmd, status isStopped) {
+    int jobID = Jobs.empty() ? 1 : Jobs.back().jobID + 1;
+    JobEntry new_job(cmd,isStopped, jobID);
     Jobs.push_back(new_job);
 }
 void JobsList::removeFinishedJobs() {
@@ -154,14 +156,14 @@ void JobsList::printJobsList() {
             cout<<endl;
     }
 }
-JobsList::JobEntry * JobsList::getJobById(int jobId) {
+JobEntry * JobsList::getJobById(int jobId) {
     for (unsigned int i = 0; i < Jobs.size(); ++i) {
         if(Jobs[i].jobID == jobId)
             return &Jobs[i];
     }
     return nullptr;
 }
-JobsList::JobEntry* JobsList::getJobByPID(pid_t pid) {
+JobEntry* JobsList::getJobByPID(pid_t pid) {
     for (unsigned int i = 0; i < Jobs.size(); ++i) {
         if(Jobs[i].process_ID == pid)
             return &Jobs[i];
@@ -181,7 +183,7 @@ void JobsList::removeJobById(int jobId) {
     }
 
 }
-JobsList::JobEntry * JobsList::getLastStoppedJob() {
+JobEntry * JobsList::getLastStoppedJob() {
     for (unsigned int i = Jobs.size()-1; i>=0; ++i) {
         if (Jobs[i].st == STOPPED)
             return &Jobs[i];
@@ -193,7 +195,7 @@ void KillCommand::execute() {
     if(stoi(arguments[1]) > 31 || stoi(arguments[1])< 1 || arguments.size() != 2){
         cout<<"smash error: kill: invalid arguments"<<endl;
     }
-    JobsList::JobEntry* job = smash.getJobs().getJobById(jobId);
+    JobEntry* job = smash.getJobs().getJobById(jobId);
     if(job){
         //TODO error handling in KILL
         kill(job->process_ID,signal);
@@ -206,7 +208,7 @@ void ForegroundCommand::execute() {
 
     SmallShell& smash = SmallShell::getInstance();
     smash.getJobs().removeFinishedJobs();
-    JobsList::JobEntry* job = smash.getJobs().getJobById(jobID);
+    JobEntry* job = smash.getJobs().getJobById(jobID);
     if(!job){
         cout<<"smash error: fg: job-id "<<job->jobID<<" does not exist"<<endl;
         return;
@@ -236,7 +238,7 @@ void ForegroundCommand::execute() {
 void BackgroundCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     smash.getJobs().removeFinishedJobs();
-    JobsList::JobEntry* job = smash.getJobs().getJobById(jobID);
+    JobEntry* job = smash.getJobs().getJobById(jobID);
     if(!job){
         cout<<"smash error: fg: job-id "<<job->jobID<<" does not exist"<<endl;
         return;
@@ -246,7 +248,7 @@ void BackgroundCommand::execute() {
         return;
     }
     if(arguments.size()==2){
-        if(job->st == JobsList::BACKGROUND){
+        if(job->st == BACKGROUND){
             cout<<"smash error: bg: job-id "<<job->jobID<<" is already running in the background"<<endl;
             return;
         }
@@ -262,7 +264,7 @@ void BackgroundCommand::execute() {
         kill(job->process_ID,SIGCONT);
         cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
     }
-    job->st = JobsList::BACKGROUND;
+    job->st = BACKGROUND;
 }
 void QuitCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
@@ -272,19 +274,18 @@ void QuitCommand::execute() {
             for (unsigned int i = 0; i <jobs.Jobs.size() ; ++i) {
                 cout<<jobs.Jobs[i].process_ID<<": "<<jobs.Jobs[i].cmd->print_cmd()<<endl;
                 kill(jobs.Jobs[i].process_ID,SIGKILL);
-                alive = false;
+                smash.alive = false;
             }
         }else{
             //TODO:: ERROR HANDLING
         }
     }else if(arguments.size() == 1){
-        alive = false;
+        smash.alive = false;
     }
 
 }
 SmallShell::SmallShell(): jobs() {
 // TODO: add your implementation
-    promptName = "smash";
     lastPWD = nullptr;
     PID = getpid();
 
@@ -302,7 +303,7 @@ Command::Command(const char *cmd_line) {
     string s = string(cmd_line);
     string temp;
     for (unsigned int i = 0; i < s.size(); ++i) {
-        if (s[i] != ' ') {
+        if (s[i] != ' ' ) {
             temp.push_back(s[i]);
         } else {
             arguments.push_back(temp);
@@ -310,8 +311,11 @@ Command::Command(const char *cmd_line) {
             while (i < s.size() && s[i] == ' ') {
                 i++;
             }
+            i--;
         }
     }
+    if(!temp.empty())
+        arguments.push_back(temp);
 }
 
 
@@ -323,36 +327,40 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
 
     if (firstWord.compare("chprompt") == 0) {
-        return new ChPromptCommand();
+        return new ChPromptCommand(cmd_line);
     } else if (firstWord.compare("showpid") == 0) {
-        return new ShowPidCommand();
+        return new ShowPidCommand(cmd_line);
     } else if (firstWord.compare("pwd") == 0) {
-        return new GetCurrDirCommand();
+        return new GetCurrDirCommand(cmd_line);
     } else if (firstWord.compare("cd") == 0) {
-        return new ChangeDirCommand(); //TODO: saweha
+        return new ChangeDirCommand(cmd_line); //TODO: saweha
     }else if(firstWord.compare("jobs") == 0){
-        return new JobsCommand();
+        return new JobsCommand(cmd_line);
     }else if(firstWord.compare("kill") == 0){
-        return new KillCommand();
+        return new KillCommand(cmd_line);
     }else if(firstWord.compare("fg") == 0){
-        return new ForegroundCommand();
+        return new ForegroundCommand(cmd_line);
     }else if(firstWord.compare("bg") == 0){
-        return new BackgroundCommand();
+        return new BackgroundCommand(cmd_line);
     }else if(firstWord.compare("quit") == 0){
-		return new QuitCommand();
-	}
-    else {
-        return new ExternalCommand(cmd_line);
+		return new QuitCommand(cmd_line);
+	}else{
+        return nullptr;
     }
+    /*else {
+        return new ExternalCommand(cmd_line);
+    }*/
 
     return nullptr;
 }
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
-    // for example:
-    // Command* cmd = CreateCommand(cmd_line);
 
-    // cmd->execute();
+     Command* cmd = CreateCommand(cmd_line);
+     if(cmd)
+        cmd->execute();
+     else
+         cout <<"sex" <<endl;
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 //TODO : CHECK IF ARGUMENTS IS VALID (ASCII IS NUMBER).

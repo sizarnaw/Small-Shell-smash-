@@ -4,10 +4,11 @@
 #include <vector>
 #include <string>
 #include <time.h>
+#include <string.h>
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define WHITESPACE  " \t\n\r\f\v"
-bool alive = true;
+
 using namespace std;
 class Command {
 // TODO: Add your data members
@@ -15,7 +16,7 @@ protected:
     vector<string> arguments;
 public:
     Command(const char* cmd_line);
-    virtual ~Command();
+    virtual ~Command()=default;
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
@@ -34,15 +35,14 @@ public:
 
 class BuiltInCommand : public Command {
 public:
-    BuiltInCommand()=default;
-    virtual ~BuiltInCommand()=default;
-	BuiltInCommand(const char* cmd):Command(cmd){}
+    BuiltInCommand(const char* cmd_line): Command(cmd_line){}
+     ~BuiltInCommand()=default;
 };
 
 class ExternalCommand : public Command {
 public:
     ExternalCommand(const char* cmd_line);
-    virtual ~ExternalCommand() {}
+     ~ExternalCommand()=default;
     void execute() override;
 };
 
@@ -68,34 +68,34 @@ class ChangeDirCommand : public BuiltInCommand {
     //+
 public:
 // TODO: Add your data members public:
-    ChangeDirCommand();
-    virtual ~ChangeDirCommand() {}
+    ChangeDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+     ~ChangeDirCommand()=default;
     void execute() override;
 };
 //(3)
 class GetCurrDirCommand : public BuiltInCommand {
 public:
     //+
-    GetCurrDirCommand();
-    virtual ~GetCurrDirCommand()=default;
+    GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+     ~GetCurrDirCommand()=default;
     void execute() override;
 };
 //(2)
 class ShowPidCommand : public BuiltInCommand {
 public:
     //+
-    ShowPidCommand()=default;
-    virtual ~ShowPidCommand()=default;
+    ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+     ~ShowPidCommand()=default;
     void execute() override;
 };
 //(1)
 class ChPromptCommand : public BuiltInCommand{
     //+
 private:
-    string promptName;
+
 public:
-    ChPromptCommand()=default;
-    virtual ~ChPromptCommand()=default;
+    ChPromptCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+     ~ChPromptCommand()=default;
     void execute() override;
 };
 
@@ -104,42 +104,45 @@ class JobsList;
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
 public:
-    QuitCommand();
-    virtual ~QuitCommand() {}
+    QuitCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+     ~QuitCommand()=default;
     void execute() override;
 };
+enum status{STOPPED,BACKGROUND};
+class JobEntry {
+public: // TODO: Add your data members
+    int jobID;
+    Command* cmd;
+    pid_t process_ID;
+    time_t entryTime;
 
 
+    status st;
+
+    JobEntry(Command* cmd,status st, int jobID):cmd(cmd),st(st), jobID(jobID){
+        entryTime = time(nullptr);
+        process_ID = getpid();
+        /*jobID = 1;
+        if(!Jobs.empty()) {
+            jobID = Jobs.back().jobID + 1;
+        }
+        entryTime = time(nullptr);
+        process_ID = getpid();*/
+    }
+};
 
 
 class JobsList {
 public:
-    enum status{STOPPED,BACKGROUND};
-    class JobEntry {
-    public: // TODO: Add your data members
-        int jobID;
-        Command* cmd;
-        pid_t process_ID;
-        time_t entryTime;
-        status st;
 
-        JobEntry(Command* cmd,status st):cmd(cmd),st(st){
-            jobID = 1;
-            if(!Jobs.empty()) {
-                jobID = Jobs.back().jobID + 1;
-            }
-            entryTime = time(nullptr);
-            process_ID = getpid();
-        }
-    };
     // TODO: Add your data members
-    static vector<JobEntry> Jobs;
+     vector<JobEntry> Jobs;
 
 
 public:
     JobsList() = default;
     ~JobsList() = default;
-    void addJob(Command* cmd, bool isStopped = false);
+    void addJob(Command* cmd, status isStopped=STOPPED);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -155,8 +158,8 @@ class JobsCommand : public BuiltInCommand {
     //+
     // TODO: Add your data members
 public:
-    JobsCommand() = default;
-    virtual ~JobsCommand()= default;
+    JobsCommand(const char* cmd_line): BuiltInCommand(cmd_line){}
+     ~JobsCommand()= default;
     void execute() override;
 };
 //(6)
@@ -166,8 +169,8 @@ class KillCommand : public BuiltInCommand {
     int jobId;
     int signal;
 public:
-    KillCommand():jobId(stoi(arguments[2])),signal(stoi(arguments[1])){}
-    virtual ~KillCommand() {}
+    KillCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobId(stoi(arguments[2])),signal(stoi(arguments[1])){}
+     ~KillCommand()=default;
     void execute() override;
 };
 //(7)
@@ -176,8 +179,8 @@ class ForegroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     int jobID;
 public:
-    ForegroundCommand():jobID(arguments.size()>1 ? stoi(arguments[1]) : 0){}
-    virtual ~ForegroundCommand() {}
+    ForegroundCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobID(arguments.size()>1 ? stoi(arguments[1]) : 0){}
+     ~ForegroundCommand()=default;
     void execute() override;
 };
 //(8)
@@ -186,8 +189,8 @@ class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     int jobID;
 public:
-    BackgroundCommand():jobID(arguments.size()>1 ? stoi(arguments[1]) : 0){};
-    virtual ~BackgroundCommand() {}
+    BackgroundCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobID(arguments.size()>1 ? stoi(arguments[1]) : 0){};
+     ~BackgroundCommand()=default;
     void execute() override;
 };
 
@@ -202,12 +205,15 @@ public:
 class SmallShell {
 private:
     // TODO: Add your data members
-    string promptName;
+
+
     string* lastPWD;
     int PID;
     JobsList jobs;
     SmallShell();
 public:
+    string promptName = "smash";
+    bool alive = true;
     Command *CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
@@ -217,8 +223,15 @@ public:
         // Instantiated on first use.
         return instance;
     }
-    void changePromptName(string name = "smash"){
-        promptName = name;
+    void changePromptName(string name){
+
+       promptName.clear();
+       int i=0;
+       while(name[i]){
+           promptName.push_back(name[i]);
+           i++;
+       }
+
     }
     int GetPID(){
         return PID;
@@ -228,7 +241,14 @@ public:
         return lastPWD;
     }
     void setLastPWD(string s){
-        *lastPWD = s;
+        if(lastPWD == nullptr){
+            lastPWD = new string(s);
+        }else{
+            lastPWD->clear();
+            for (char i : s) {
+                lastPWD->push_back(i);
+            }
+        }
     }
     JobsList& getJobs(){
         return jobs;
