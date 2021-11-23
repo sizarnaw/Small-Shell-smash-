@@ -13,8 +13,10 @@ using namespace std;
 class Command {
 // TODO: Add your data members
 protected:
+
     vector<string> arguments;
 public:
+    enum type{BG,FG};
     Command(const char* cmd_line);
     virtual ~Command()=default;
     virtual void execute() = 0;
@@ -35,13 +37,25 @@ public:
 
 class BuiltInCommand : public Command {
 public:
-    BuiltInCommand(const char* cmd_line): Command(cmd_line){}
+
+    BuiltInCommand(const char* cmd_line): Command(cmd_line){
+
+    }
      ~BuiltInCommand()=default;
 };
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char* cmd_line);
+    const char* cmd;
+    bool BG;
+    char**  arr_arg;
+    ExternalCommand(const char* cmd_line,bool isBG): Command(cmd_line),cmd(cmd_line),BG(isBG){
+        arr_arg = (char**)malloc(arguments.size());
+        for (int i = 0; i < arguments.size(); ++i) {
+            arr_arg[i] = (char*)malloc(arguments[i].size());
+            strcpy(arr_arg[i],arguments[i].c_str());
+        }
+    }
      ~ExternalCommand()=default;
     void execute() override;
 };
@@ -119,9 +133,8 @@ public: // TODO: Add your data members
 
     status st;
 
-    JobEntry(Command* cmd,status st, int jobID):cmd(cmd),st(st), jobID(jobID){
+    JobEntry(Command* cmd,pid_t pid,status st, int jobID):cmd(cmd),st(st), jobID(jobID),process_ID(pid){
         entryTime = time(nullptr);
-        process_ID = getpid();
         /*jobID = 1;
         if(!Jobs.empty()) {
             jobID = Jobs.back().jobID + 1;
@@ -142,7 +155,7 @@ public:
 public:
     JobsList() = default;
     ~JobsList() = default;
-    void addJob(Command* cmd, status isStopped=STOPPED);
+    void addJob(Command* cmd,pid_t pid ,status isStopped=STOPPED);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();

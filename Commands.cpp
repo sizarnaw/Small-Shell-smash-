@@ -128,18 +128,20 @@ void ChangeDirCommand::execute() {
 }
 
 //JobList
-void JobsList::addJob(Command *cmd, status isStopped) {
+void JobsList::addJob(Command *cmd,pid_t pid, status isStopped) {
     int jobID = Jobs.empty() ? 1 : Jobs.back().jobID + 1;
-    JobEntry new_job(cmd,isStopped, jobID);
+
+    JobEntry new_job(cmd,pid,isStopped, jobID);
     Jobs.push_back(new_job);
 }
 void JobsList::removeFinishedJobs() {
     int status;
 
     for (unsigned int i = 0; i <Jobs.size() ; ++i) {
+
         pid_t return_pid = waitpid(Jobs[i].process_ID,&status,WNOHANG);
         if(return_pid == -1){
-            //TODO : ERROR
+            cout << "errorr here" <<endl;
         } else if(return_pid == Jobs[i].process_ID){
             Jobs.erase(Jobs.begin()+i,Jobs.begin()+i+1);
             i--;
@@ -284,6 +286,44 @@ void QuitCommand::execute() {
     }
 
 }
+char* getNewCMD(const char* cmd){
+    int i =0;
+    while(cmd[i]) {
+        i++;
+    }
+    char* new_cmd = new char[i];
+    strcpy(new_cmd,cmd);
+    return new_cmd;
+}
+void ExternalCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    int pid = fork();
+    if(pid>0){
+        if(BG) {
+            smash.getJobs().addJob(this,pid, BACKGROUND);
+
+
+        }else{
+            int status;
+            waitpid(pid,&status,WUNTRACED);
+        }
+
+    }
+    else if(pid == 0){
+        char path[10];
+        strcpy(path,"/bin/bash");
+        char flag[3];
+        strcpy(flag,"-c");
+        char* new_cmd = getNewCMD(cmd);
+         char*  argv[4] = {path,flag,new_cmd, nullptr};
+
+        execv(path,argv);
+        delete new_cmd;
+
+
+    }
+
+}
 SmallShell::SmallShell(): jobs() {
 // TODO: add your implementation
     lastPWD = nullptr;
@@ -326,6 +366,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
 
+
     if (firstWord.compare("chprompt") == 0) {
         return new ChPromptCommand(cmd_line);
     } else if (firstWord.compare("showpid") == 0) {
@@ -344,21 +385,22 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new BackgroundCommand(cmd_line);
     }else if(firstWord.compare("quit") == 0){
 		return new QuitCommand(cmd_line);
-	}else{
-        return nullptr;
-    }
-    /*else {
-        return new ExternalCommand(cmd_line);
-    }*/
+	}
+    else {
 
-    return nullptr;
+        return new ExternalCommand(cmd_line,_isBackgroundComamnd(cmd_line));
+    }
+
 }
 void SmallShell::executeCommand(const char *cmd_line) {
     // TODO: Add your implementation here
 
      Command* cmd = CreateCommand(cmd_line);
-     if(cmd)
-        cmd->execute();
+     
+     if(cmd) {
+
+         cmd->execute();
+     }
      else
          cout <<"sex" <<endl;
     // Please note that you must fork smash process for some commands (e.g., external commands....)
