@@ -70,9 +70,14 @@ public:
 
 class RedirectionCommand : public Command {
     // TODO: Add your data members
+    enum op{APPEND,OVERRIDE};
+    op operation;
+    const char* cmd_line;
 public:
-    explicit RedirectionCommand(const char* cmd_line);
-    virtual ~RedirectionCommand() {}
+     RedirectionCommand(const char* cmd_line, int op): Command(cmd_line),cmd_line(cmd_line){
+         operation = op == 1 ? OVERRIDE : APPEND;
+    }
+     ~RedirectionCommand()= default;
     void execute() override;
     //void prepare() override;
     //void cleanup() override;

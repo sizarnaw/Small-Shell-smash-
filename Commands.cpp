@@ -8,8 +8,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <fstream>
+#include <fcntl.h>
+
 
 using namespace std;
+
 
 #if 0
 #define FUNC_ENTRY()  \
@@ -321,6 +325,45 @@ void ExternalCommand::execute() {
     }
 
 }
+const char* converttochar(vector<string> args) {
+    string cmd;
+    int index = 0;
+    while(args[index] != ">" && args[index] != ">>") {
+        cmd += args[index];
+        cmd += " ";
+        index++;
+    }
+
+    return cmd.c_str();
+}
+void RedirectionCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    int fd;
+    if(operation == OVERRIDE) {
+        fd = open(arguments.back().c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+    }else{
+        fd = open(arguments.back().c_str(), O_CREAT | O_RDWR |O_APPEND, 0644);
+    }
+    if(fd == -1) {
+        cout << "ERROR" << endl; //TODO: ERROR HANGLING
+        return;
+    }
+
+    int stdoutcopy = dup(1);
+    close(1);
+    dup2(fd,1);
+    string cmd;
+    int index = 0;
+    while(arguments[index] != ">" && arguments[index] != ">>") {
+        cmd += arguments[index];
+        cmd += " ";
+        index++;
+    }
+    smash.executeCommand(cmd.c_str());
+
+    close(fd);
+    dup2(stdoutcopy,1);
+}
 SmallShell::SmallShell(): jobs() {
 // TODO: add your implementation
     lastPWD = nullptr;
@@ -354,14 +397,29 @@ Command::Command(const char *cmd_line) {
         arguments.push_back(temp);
 }
 
-
+int checkSpecial(const char* cmd_line){
+    int index = 0;
+    while(cmd_line[index]){
+        if(cmd_line[index] == '>'){
+            if(cmd_line[index+1] == '>') {
+                return 2;
+            }else{
+                return 1;
+            }
+        }
+        index++;
+    }
+    return 0;
+}
 Command * SmallShell::CreateCommand(const char* cmd_line) {
     // For example:
     //cmd_s command without spaces
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-
-
+    int special = checkSpecial( cmd_line);
+    if(special > 0){
+        return new RedirectionCommand(cmd_line,special);
+    }
 
     if (firstWord.compare("chprompt") == 0) {
         return new ChPromptCommand(cmd_line);
@@ -382,7 +440,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     }else if(firstWord.compare("quit") == 0){
 		return new QuitCommand(cmd_line);
 	}
-    else {
+    else  {
 
         return new ExternalCommand(cmd_line,_isBackgroundComamnd(cmd_line));
     }
