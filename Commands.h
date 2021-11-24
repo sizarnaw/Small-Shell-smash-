@@ -182,7 +182,7 @@ class KillCommand : public BuiltInCommand {
     int jobId;
     int signal;
 public:
-    KillCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobId(stoi(arguments[2])),signal(stoi(arguments[1])){}
+    KillCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobId(stoi(arguments[2])),signal(stoi(arguments[1].substr(1))){}
      ~KillCommand()=default;
     void execute() override;
 };

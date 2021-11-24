@@ -136,9 +136,7 @@ void JobsList::addJob(Command *cmd,pid_t pid, status isStopped) {
 }
 void JobsList::removeFinishedJobs() {
     int status;
-
     for (unsigned int i = 0; i <Jobs.size() ; ++i) {
-
         pid_t return_pid = waitpid(Jobs[i].process_ID,&status,WNOHANG);
         if(return_pid == -1){
             cout << "errorr here" <<endl;
@@ -194,8 +192,8 @@ JobEntry * JobsList::getLastStoppedJob() {
 }
 void KillCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
-    if(stoi(arguments[1]) > 31 || stoi(arguments[1])< 1 || arguments.size() != 2){
-        cout<<"smash error: kill: invalid arguments"<<endl;
+    if(signal > 31 || signal < 1 || arguments.size() != 3){
+        perror("kill: invalid arguments");
     }
     JobEntry* job = smash.getJobs().getJobById(jobId);
     if(job){
@@ -221,8 +219,8 @@ void ForegroundCommand::execute() {
     }else if (arguments.size() == 2){
         kill(job->process_ID,SIGCONT);
         int status;
-        waitpid(job->process_ID,&status,WCONTINUED);
         cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
+        waitpid(job->process_ID,&status,WCONTINUED);
     }else if(arguments.size() == 1){
         if(smash.getJobs().Jobs.empty()){
             cout<<"smash error: fg: jobs list is empty"<<endl;
@@ -288,11 +286,12 @@ void QuitCommand::execute() {
 }
 char* getNewCMD(const char* cmd){
     int i =0;
-    while(cmd[i]) {
+    while(cmd[i] && cmd[i] != '&') {
         i++;
     }
-    char* new_cmd = new char[i];
+    char* new_cmd = new char[i - 1];
     strcpy(new_cmd,cmd);
+    _removeBackgroundSign(new_cmd);
     return new_cmd;
 }
 void ExternalCommand::execute() {
@@ -301,8 +300,6 @@ void ExternalCommand::execute() {
     if(pid>0){
         if(BG) {
             smash.getJobs().addJob(this,pid, BACKGROUND);
-
-
         }else{
             int status;
             waitpid(pid,&status,WUNTRACED);
@@ -315,7 +312,7 @@ void ExternalCommand::execute() {
         char flag[3];
         strcpy(flag,"-c");
         char* new_cmd = getNewCMD(cmd);
-         char*  argv[4] = {path,flag,new_cmd, nullptr};
+        char*  argv[4] = {path,flag,new_cmd, nullptr};
 
         execv(path,argv);
         delete new_cmd;
@@ -328,7 +325,6 @@ SmallShell::SmallShell(): jobs() {
 // TODO: add your implementation
     lastPWD = nullptr;
     PID = getpid();
-
 }
 
 SmallShell::~SmallShell() {
