@@ -51,7 +51,7 @@ public:
     char**  arr_arg;
     ExternalCommand(const char* cmd_line,bool isBG): Command(cmd_line),cmd(cmd_line),BG(isBG){
         arr_arg = (char**)malloc(arguments.size());
-        for (int i = 0; i < arguments.size(); ++i) {
+        for (unsigned int i = 0; i < arguments.size(); ++i) {
             arr_arg[i] = (char*)malloc(arguments[i].size());
             strcpy(arr_arg[i],arguments[i].c_str());
         }
@@ -143,8 +143,9 @@ public: // TODO: Add your data members
 
     status st;
 
-    JobEntry(Command* cmd,pid_t pid,status st, int jobID):cmd(cmd),st(st), jobID(jobID),process_ID(pid){
+    JobEntry(Command* cmd,pid_t pid,status sta, int jobID):jobID(jobID), cmd(cmd), process_ID(pid){
         entryTime = time(nullptr);
+        st = sta;
         /*jobID = 1;
         if(!Jobs.empty()) {
             jobID = Jobs.back().jobID + 1;
@@ -235,6 +236,8 @@ private:
     JobsList jobs;
     SmallShell();
 public:
+    Command* currCmd = nullptr;
+    pid_t currForegroundPID;
     string promptName = "smash";
     bool alive = true;
     Command *CreateCommand(const char* cmd_line);

@@ -213,30 +213,43 @@ void ForegroundCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     smash.getJobs().removeFinishedJobs();
     JobEntry* job = smash.getJobs().getJobById(jobID);
-    if(!job){
-        cout<<"smash error: fg: job-id "<<job->jobID<<" does not exist"<<endl;
+
+    if(!job && arguments.size() > 1){
+        cout<<"smash error: fg: job-id "<< jobID <<" does not exist"<<endl;
         return;
     }
+
     if(arguments.size() >2){
         cout<<"smash error: fg: invalid arguments"<<endl;
         return;
     }else if (arguments.size() == 2){
-        kill(job->process_ID,SIGCONT);
-        int status;
         cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
-        waitpid(job->process_ID,&status,WCONTINUED);
+        int status;
+        int currPid = job->process_ID;
+        kill(job->process_ID,SIGCONT);
+        smash.currForegroundPID = job->process_ID;
+        smash.currCmd = job->cmd;
+        smash.getJobs().removeJobById(job->jobID);
+
+        waitpid(currPid ,&status,WUNTRACED);
     }else if(arguments.size() == 1){
+
         if(smash.getJobs().Jobs.empty()){
             cout<<"smash error: fg: jobs list is empty"<<endl;
             return;
         }
-        *job=smash.getJobs().Jobs.back();
-        kill(job->process_ID,SIGCONT);
-        int status;
-        waitpid(job->process_ID,&status,WCONTINUED);
+        job = smash.getJobs().getLastStoppedJob();
         cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
+        kill(job->process_ID,SIGCONT);
+
+        int status;
+        int currPid = job->process_ID;
+        smash.currForegroundPID = job->process_ID;
+        smash.currCmd = job->cmd;
+        smash.getJobs().removeJobById(job->jobID);
+
+        waitpid(currPid ,&status,WUNTRACED);
     }
-    smash.getJobs().removeJobById(job->jobID);
 }
 
 void BackgroundCommand::execute() {
@@ -244,7 +257,7 @@ void BackgroundCommand::execute() {
     smash.getJobs().removeFinishedJobs();
     JobEntry* job = smash.getJobs().getJobById(jobID);
     if(!job){
-        cout<<"smash error: fg: job-id "<<job->jobID<<" does not exist"<<endl;
+        cout<<"smash error: fg: job-id "<<jobID<<" does not exist"<<endl;
         return;
     }
     if(arguments.size()>2){
@@ -307,6 +320,7 @@ void ExternalCommand::execute() {
             smash.getJobs().addJob(this,pid, BACKGROUND);
         }else{
             int status;
+            smash.currForegroundPID = pid;
             waitpid(pid,&status,WUNTRACED);
         }
 
@@ -342,7 +356,7 @@ void PipeCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     string firstCommand, secondCommand;
 
-    int i = 0;
+    unsigned int i = 0;
     for(; i < arguments.size(); i++){
         if(arguments[i] == "|" || arguments[i] == "|&")
             break;
@@ -514,11 +528,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
      Command* cmd = CreateCommand(cmd_line);
      
      if(cmd) {
-
+        currCmd = cmd;
          cmd->execute();
      }
      else
-         cout <<"sex" <<endl;
+         currCmd = nullptr;
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 //TODO : CHECK IF ARGUMENTS IS VALID (ASCII IS NUMBER).
