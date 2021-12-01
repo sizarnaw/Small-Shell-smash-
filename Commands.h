@@ -62,8 +62,13 @@ public:
 
 class PipeCommand : public Command {
     // TODO: Add your data members
+    enum op {PIPE, PIPEERROR};
+    op operation;
+    const char* cmd_line;
 public:
-    PipeCommand(const char* cmd_line);
+    PipeCommand(const char* cmd_line, int op) : Command(cmd_line), cmd_line(cmd_line){
+        operation = op == 3 ? PIPE : PIPEERROR;
+    }
     virtual ~PipeCommand() {}
     void execute() override;
 };

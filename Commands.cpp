@@ -298,6 +298,7 @@ char* getNewCMD(const char* cmd){
     _removeBackgroundSign(new_cmd);
     return new_cmd;
 }
+
 void ExternalCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     int pid = fork();
@@ -336,6 +337,55 @@ const char* converttochar(vector<string> args) {
 
     return cmd.c_str();
 }
+
+void PipeCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    string firstCommand, secondCommand;
+
+    int i = 0;
+    for(; i < arguments.size(); i++){
+        if(arguments[i] == "|" || arguments[i] == "|&")
+            break;
+        firstCommand += arguments[i];
+        firstCommand += " ";
+    }
+    i++;
+    for(; i < arguments.size(); i++){
+        secondCommand += arguments[i];
+        secondCommand += " ";
+    }
+
+    int myPipe[2];
+    pipe(myPipe);
+    int stdInCopy = dup(0);
+    int stdOutCopy = dup(1);
+    int stdErrCopy = dup(2);
+
+    pid_t pid = fork();
+    if(pid == 0){
+        //child
+        close(myPipe[0]); // closing the writing channel
+        close(1);
+        dup2(myPipe[1],operation == PIPE ? 1 : 2);
+        smash.executeCommand(firstCommand.c_str());
+        exit(1);
+    } else {
+        //parent
+        close(myPipe[1]); //closing the reading channel
+        close(0);
+        dup2(myPipe[0], 0);
+        smash.executeCommand(secondCommand.c_str());
+    }
+
+    close(myPipe[0]);
+    close(myPipe[1]);
+
+    dup2(stdInCopy, 0);
+    dup2(stdOutCopy, 1);
+    dup2(stdErrCopy, 2);
+}
+
+
 void RedirectionCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     int fd;
@@ -396,7 +446,12 @@ Command::Command(const char *cmd_line) {
     if(!temp.empty())
         arguments.push_back(temp);
 }
-
+/*
+ * 1 = >
+ * 2 = >>
+ * 3 = |
+ * 4 = |&
+ */
 int checkSpecial(const char* cmd_line){
     int index = 0;
     while(cmd_line[index]){
@@ -406,6 +461,11 @@ int checkSpecial(const char* cmd_line){
             }else{
                 return 1;
             }
+        }
+        if(cmd_line[index] == '|'){
+            if(cmd_line[index + 1] == '&')
+                return 4;
+            return 3;
         }
         index++;
     }
@@ -417,8 +477,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
     int special = checkSpecial( cmd_line);
-    if(special > 0){
+    if(special == 1 || special == 2){
         return new RedirectionCommand(cmd_line,special);
+    } else if(special == 3 || special == 4) {
+        return new PipeCommand(cmd_line, special);
     }
 
     if (firstWord.compare("chprompt") == 0) {
