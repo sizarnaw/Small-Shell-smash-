@@ -4,6 +4,7 @@
 #include "unistd.h"
 #include "Commands.h"
 
+
 using namespace std;
 
 void ctrlZHandler(int sig_num) {
@@ -14,11 +15,14 @@ void ctrlZHandler(int sig_num) {
     cout << "smash: got ctrl-Z" << endl;
     if(pid == 0)
         return;
-    int res = kill(pid, SIGSTOP);
+
+    int res = kill(pid,SIGSTOP);
     if(res == 0) {
+
         smash.getJobs().addJob(smash.currCmd, pid, STOPPED);
         cout << "smash: process " << pid << " was stopped" << endl;
     }
+
 }
 
 void ctrlCHandler(int sig_num) {
@@ -32,7 +36,17 @@ void ctrlCHandler(int sig_num) {
     }
 }
 
-void alarmHandler(int sig_num) {
-    // TODO: Add your implementation
+void alarmHandler(int sig_num,siginfo_t* info,void* context) {
+    cout <<"smash got an alarm"<<endl;
+    SmallShell& smash = SmallShell::getInstance();
+    pid_t pid = info->si_pid;
+    JobEntry* job = smash.getJobs().getJobByPID(pid);
+    if(!job)
+        return;
+
+    int res = kill(pid,SIGKILL);
+    if(res == 0){
+        cout << job->cmd->print_cmd()<< " timed out!" << endl;
+    }
 }
 

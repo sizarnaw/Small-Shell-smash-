@@ -141,10 +141,12 @@ void JobsList::addJob(Command *cmd,pid_t pid, status isStopped) {
 void JobsList::removeFinishedJobs() {
     int status;
     for (unsigned int i = 0; i <Jobs.size() ; ++i) {
-        pid_t return_pid = waitpid(Jobs[i].process_ID,&status,WNOHANG);
+        pid_t return_pid = waitpid(Jobs[i].process_ID,&status,WNOHANG );
+
         if(return_pid == -1){
             cout << "errorr here" <<endl;
         } else if(return_pid == Jobs[i].process_ID){
+
             Jobs.erase(Jobs.begin()+i,Jobs.begin()+i+1);
             i--;
         }
@@ -326,6 +328,7 @@ void ExternalCommand::execute() {
 
     }
     else if(pid == 0){
+        setpgrp();
         char path[10];
         strcpy(path,"/bin/bash");
         char flag[3];
@@ -378,6 +381,7 @@ void PipeCommand::execute() {
     pid_t pid = fork();
     if(pid == 0){
         //child
+        setpgrp();
         close(myPipe[0]); // closing the writing channel
         close(1);
         dup2(myPipe[1],operation == PIPE ? 1 : 2);
