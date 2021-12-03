@@ -221,12 +221,15 @@ public:
 
 class HeadCommand : public BuiltInCommand {
 public:
-    int size;
+    int size = 10;
     string file_name;
     HeadCommand(const char* cmd_line): BuiltInCommand(cmd_line){
-        assert(arguments[1][0] == '-');
-        arguments[11].erase(arguments[1].begin());
-        size = arguments.size()> 2 ? stoi(arguments[1]) : 10;
+
+        if(arguments.size()> 2) {
+            assert(arguments[1][0] == '-');
+            arguments[1].erase(arguments[1].begin());
+            size =  stoi(arguments[1]);
+        }
         file_name = arguments.size() > 2 ? arguments[2] : arguments[1];
     }
      ~HeadCommand()=default;

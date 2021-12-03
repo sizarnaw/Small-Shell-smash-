@@ -86,20 +86,16 @@ void ChPromptCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     if(arguments.size() == 1){
         smash.changePromptName("smash");
-    }else if(arguments.size() == 2){
+    }else if(arguments.size() >= 2){
         smash.changePromptName(arguments[1]);
-    }else{
-        //TODO Error Handling
     }
 }
 void ShowPidCommand::execute() {
-    if(arguments.size() > 1)
-        return;
+
     cout<<"smash pid is "<<SmallShell::getInstance().GetPID()<<endl;
 }
 void GetCurrDirCommand::execute() {
-    if(arguments.size() > 1)
-        return;
+
     cout<<get_current_dir_name()<<endl;
 }
 
@@ -109,8 +105,10 @@ void ChangeDirCommand::execute() {
     if(arguments.size() == 2){
 
         if(arguments[1] == "-"){ //(cd -) command
-            if(smash.getLastPWD() == nullptr)
-                cout<<"smash error: cd: OLDPWD not set"<<endl;
+            if(smash.getLastPWD() == nullptr) {
+                cout << "smash error: cd: OLDPWD not set" << endl;
+                return;
+            }
             int res = chdir((*smash.getLastPWD()).c_str());
             if(res == -1){
                 //TODO ERROR HANDLING
@@ -121,7 +119,7 @@ void ChangeDirCommand::execute() {
 
             int res = chdir(arguments[1].c_str());
             if(res == -1){
-                //TODO ERROR HANDLING
+                cout << "smash error: chdir failed: No such file or directory" << endl;
                 return;
             }
             smash.setLastPWD(prev);
@@ -299,8 +297,9 @@ void HeadCommand::execute() {
     }
     string out;
     for(int i =0; i <size; i ++){
-        if(file.eof())
+        if(file.eof()) {
             break;
+        }
         getline(file,out);
         cout<< out<< endl;
     }
@@ -317,6 +316,7 @@ void QuitCommand::execute() {
                 smash.alive = false;
             }
         }else{
+
             //TODO:: ERROR HANDLING
         }
     }else if(arguments.size() == 1){
@@ -540,7 +540,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new BackgroundCommand(cmd_line);
     }else if(firstWord.compare("quit") == 0){
 		return new QuitCommand(cmd_line);
-	}
+	}else if(firstWord.compare("head") == 0){
+        return new HeadCommand(cmd_line);
+    }
     else  {
 
         return new ExternalCommand(cmd_line,_isBackgroundComamnd(cmd_line));
