@@ -5,6 +5,7 @@
 #include <string>
 #include <time.h>
 #include <string.h>
+#include "assert.h"
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define WHITESPACE  " \t\n\r\f\v"
@@ -220,8 +221,15 @@ public:
 
 class HeadCommand : public BuiltInCommand {
 public:
-    HeadCommand(const char* cmd_line);
-    virtual ~HeadCommand() {}
+    int size;
+    string file_name;
+    HeadCommand(const char* cmd_line): BuiltInCommand(cmd_line){
+        assert(arguments[1][0] == '-');
+        arguments[11].erase(arguments[1].begin());
+        size = arguments.size()> 2 ? stoi(arguments[1]) : 10;
+        file_name = arguments.size() > 2 ? arguments[2] : arguments[1];
+    }
+     ~HeadCommand()=default;
     void execute() override;
 };
 

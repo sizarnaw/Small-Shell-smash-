@@ -285,6 +285,27 @@ void BackgroundCommand::execute() {
     }
     job->st = BACKGROUND;
 }
+
+void HeadCommand::execute() {
+    if(arguments.size() < 2){
+        //TODO: ERROR HAndling
+    }
+    if(arguments.size() >3)
+        return;
+    ifstream file;
+    file.open(file_name);
+    if(!file.good()){
+        //TODO: Error handling
+    }
+    string out;
+    for(int i =0; i <size; i ++){
+        if(file.eof())
+            break;
+        getline(file,out);
+        cout<< out<< endl;
+    }
+    file.close();
+}
 void QuitCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     JobsList jobs = smash.getJobs();
