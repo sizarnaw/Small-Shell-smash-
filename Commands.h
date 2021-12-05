@@ -25,8 +25,9 @@ public:
     //virtual void cleanup();
     string print_cmd(){
         string res;
-        int size = arguments.size();
-        for (int i = 0; i <size ; ++i) {
+
+        unsigned int size = arguments.size();
+        for (unsigned int i = 0; i <size ; ++i) {
             res+=arguments[i];
             res+=" ";
         }
@@ -174,7 +175,9 @@ public:
     JobEntry * getJobById(int jobId);
     JobEntry* getJobByPID(pid_t pid);
     void removeJobById(int jobId);
-    JobEntry * getLastJob(int* lastJobId);
+    JobEntry * getLastJob(){
+        return &Jobs[Jobs.size()-1];
+    }
     JobEntry *getLastStoppedJob();
     // TODO: Add extra methods or modify exisitng ones as needed
 };

@@ -102,7 +102,7 @@ void GetCurrDirCommand::execute() {
 void ChangeDirCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     string prev = get_current_dir_name();
-    if(arguments.size() == 2){
+    if(arguments.size() <= 2){
 
         if(arguments[1] == "-"){ //(cd -) command
             if(smash.getLastPWD() == nullptr) {
@@ -128,7 +128,6 @@ void ChangeDirCommand::execute() {
         cout<<"smash error: cd: too many arguments"<<endl;
     }
 }
-
 //JobList
 void JobsList::addJob(Command *cmd,pid_t pid, status isStopped) {
     int jobID = Jobs.empty() ? 1 : Jobs.back().jobID + 1;
@@ -188,9 +187,12 @@ void JobsList::removeJobById(int jobId) {
 
 }
 JobEntry * JobsList::getLastStoppedJob() {
-    for (unsigned int i = Jobs.size()-1; i>=0; ++i) {
+    int i = Jobs.size()-1;
+        while(i >= 0){
+        cout<<i<<endl;
         if (Jobs[i].st == STOPPED)
             return &Jobs[i];
+        i--;
     }
     return nullptr;
 }
@@ -238,17 +240,26 @@ void ForegroundCommand::execute() {
             cout<<"smash error: fg: jobs list is empty"<<endl;
             return;
         }
+
         job = smash.getJobs().getLastStoppedJob();
+        if(!job){
+            job = smash.getJobs().getLastJob();
+        }
+
+
         cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
+
         kill(job->process_ID,SIGCONT);
 
         int status;
         int currPid = job->process_ID;
         smash.currForegroundPID = job->process_ID;
         smash.currCmd = job->cmd;
+
         smash.getJobs().removeJobById(job->jobID);
 
         waitpid(currPid ,&status,WUNTRACED);
+
     }
 }
 

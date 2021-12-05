@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     //TODO: setup sig alarm handler
 
     SmallShell& smash = SmallShell::getInstance();
-
+    int i =0;
     std::cout << smash.promptName<<"> ";
     while(smash.alive) {
         smash.currForegroundPID = 0;
@@ -35,6 +35,8 @@ int main(int argc, char* argv[]) {
         std::getline(std::cin, cmd_line);
         smash.executeCommand(cmd_line.c_str());
         smash.getJobs().removeFinishedJobs();
+        cout<<i<<endl;
+        i++;
         if(smash.alive)
             std::cout << smash.promptName<<"> ";
     }
