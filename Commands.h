@@ -8,21 +8,24 @@
 #include "assert.h"
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
-#define WHITESPACE  " \t\n\r\f\v"
+#define WHITESPACE  " \t\n\r\f\v\0"
 
 using namespace std;
 class Command {
 // TODO: Add your data members
 protected:
-
     vector<string> arguments;
+    string cmd_line;
 public:
     enum type{BG,FG};
-    Command(const char* cmd_line);
+    Command(const char* line);
     virtual ~Command()=default;
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
+    string getCmdLine(){
+        return cmd_line;
+    }
     string print_cmd(){
         string res;
 
@@ -51,8 +54,8 @@ public:
     const char* cmd;
     bool BG;
     char**  arr_arg;
-    ExternalCommand(const char* cmd_line,bool isBG): Command(cmd_line),cmd(cmd_line),BG(isBG){
-        arr_arg = (char**)malloc(arguments.size());
+    ExternalCommand(const char* cmd_line ,bool isBG): Command(cmd_line),cmd(cmd_line),BG(isBG),arr_arg((char**)malloc(arguments.size())){
+        //arr_arg = (char**)malloc(arguments.size());
         for (unsigned int i = 0; i < arguments.size(); ++i) {
             arr_arg[i] = (char*)malloc(arguments[i].size());
             strcpy(arr_arg[i],arguments[i].c_str());
@@ -191,13 +194,17 @@ public:
     void execute() override;
 };
 //(6)
+
 class KillCommand : public BuiltInCommand {
     //+
     // TODO: Add your data members
     int jobId;
     int signal;
+
 public:
-    KillCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobId(stoi(arguments[2])),signal(stoi(arguments[1].substr(1))){}
+    KillCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobId(0), signal(0){
+        //kill -<signum> <job id>
+    }
      ~KillCommand()=default;
     void execute() override;
 };
@@ -207,7 +214,7 @@ class ForegroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     int jobID;
 public:
-    ForegroundCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobID(arguments.size()>1 ? stoi(arguments[1]) : 0){}
+    ForegroundCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobID(0){}
      ~ForegroundCommand()=default;
     void execute() override;
 };
@@ -217,7 +224,7 @@ class BackgroundCommand : public BuiltInCommand {
     // TODO: Add your data members
     int jobID;
 public:
-    BackgroundCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobID(arguments.size()>1 ? stoi(arguments[1]) : 0){};
+    BackgroundCommand(const char* cmd_line): BuiltInCommand(cmd_line),jobID(0){};
      ~BackgroundCommand()=default;
     void execute() override;
 };
@@ -227,13 +234,6 @@ public:
     int size = 10;
     string file_name;
     HeadCommand(const char* cmd_line): BuiltInCommand(cmd_line){
-
-        if(arguments.size()> 2) {
-            assert(arguments[1][0] == '-');
-            arguments[1].erase(arguments[1].begin());
-            size =  stoi(arguments[1]);
-        }
-        file_name = arguments.size() > 2 ? arguments[2] : arguments[1];
     }
      ~HeadCommand()=default;
     void execute() override;
