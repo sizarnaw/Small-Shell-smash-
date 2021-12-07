@@ -130,6 +130,7 @@ void ChangeDirCommand::execute() {
 }
 //JobList
 void JobsList::addJob(Command *cmd,pid_t pid, status isStopped) {
+    removeFinishedJobs();
     int jobID = Jobs.empty() ? 1 : Jobs.back().jobID + 1;
 
     JobEntry new_job(cmd,pid,isStopped, jobID);
@@ -322,8 +323,8 @@ void BackgroundCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     smash.getJobs().removeFinishedJobs();
     JobEntry* job = smash.getJobs().getJobById(jobID);
-    if(!job){
-        cout<<"smash error: fg: job-id "<<jobID<<" does not exist"<<endl;
+    if(!job && arguments.size() > 1){
+        cout<<"smash error: bg: job-id "<< jobID <<" does not exist"<<endl;
         return;
     }
     if(arguments.size()>2){
@@ -486,23 +487,33 @@ void PipeCommand::execute() {
         close(myPipe[0]); // closing the writing channel
         close(1);
         dup2(myPipe[1],operation == PIPE ? 1 : 2);
-        smash.executeCommand(firstCommand.c_str());
+        firstCmd = new char(firstCommand.size());
+        strcpy(firstCmd, firstCommand.c_str());
+        smash.executeCommand(firstCmd);
         exit(1);
     } else {
         //parent
-        close(myPipe[1]); //closing the reading channel
+        waitpid(pid, NULL, WSTOPPED);
+        close(myPipe[0]);
         close(0);
-        dup2(myPipe[0], 0);
-        smash.executeCommand(secondCommand.c_str());
+        secondCmd = new char(secondCommand.size());
+        strcpy(secondCmd, secondCommand.c_str());
+        smash.executeCommand(secondCmd);
+        //exit(1);
     }
+    if(pid) {
+        close(myPipe[0]);
+        close(myPipe[1]);
 
-    close(myPipe[0]);
-    close(myPipe[1]);
-
-    dup2(stdInCopy, 0);
-    dup2(stdOutCopy, 1);
-    dup2(stdErrCopy, 2);
+        dup2(stdInCopy, 0);
+        dup2(stdOutCopy, 1);
+        dup2(stdErrCopy, 2);
+    } else {
+        exit(0);
+    }
 }
+
+
 
 
 void RedirectionCommand::execute() {
@@ -617,7 +628,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     // For example:
     //cmd_s command without spaces
     string cmd_s = _trim(string(cmd_line));
-    string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n\0&"));
+    string firstWord = cmd_s.substr(0, cmd_s.find_first_of("& \n"));
     int special = checkSpecial( cmd_line);
     if(special == 1 || special == 2){
         return new RedirectionCommand(cmd_line,special);
