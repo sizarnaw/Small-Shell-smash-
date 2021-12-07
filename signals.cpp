@@ -9,24 +9,27 @@ using namespace std;
 
 void ctrlZHandler(int sig_num) {
     // TODO: Add your implementation
-    SmallShell& smash = SmallShell::getInstance();
+    SmallShell &smash = SmallShell::getInstance();
 
     pid_t pid = smash.currForegroundPID;
 
     cout << "smash: got ctrl-Z" << endl;
-    if(pid == 0)
+    if (pid == 0)
         return;
 
-    int res = kill(pid,SIGSTOP);
-    if(res == 0) {
-
-        smash.getJobs().addJob(smash.currCmd, pid, STOPPED);
+    int res = kill(pid, SIGSTOP);
+    if (res == 0) {
+        //JobEntry *job = smash.getJobs().getJobById(pid);
+        JobEntry *job = smash.getJobs().getJobByPID(pid);
+        if (job) {
+            job->st = STOPPED;
+        } else {
+            smash.getJobs().addJob(smash.currCmd, pid, STOPPED);
+        }
         cout << "smash: process " << pid << " was stopped" << endl;
     } else {
-
         perror("smash error: kill failed");
     }
-
 }
 
 void ctrlCHandler(int sig_num) {

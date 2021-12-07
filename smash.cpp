@@ -27,20 +27,15 @@ int main(int argc, char* argv[]) {
 
     SmallShell& smash = SmallShell::getInstance();
     while(smash.alive) {
-
         smash.currForegroundPID = 0;
         smash.currCmd = nullptr;
-
         std::string cmd_line;
+        smash.getJobs().removeFinishedJobs();
         if(smash.alive)
             std::cout << smash.promptName<<"> ";
         std::getline(std::cin, cmd_line);
-        if(cmd_line[0] == '#') {
-            continue;
-        }
         smash.executeCommand(cmd_line.c_str());
         smash.getJobs().removeFinishedJobs();
-
 
     }
     return 0;

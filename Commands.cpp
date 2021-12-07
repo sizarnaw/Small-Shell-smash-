@@ -140,10 +140,12 @@ void JobsList::removeFinishedJobs() {
 
 
     for (unsigned int i = 0; i <Jobs.size() ; ++i) {
+        if(Jobs[i].st == FOREGROUND)
+            continue;
         pid_t return_pid = waitpid(Jobs[i].process_ID,&status,WNOHANG );
 
         if(return_pid == -1){
-            cout << "erorr here" <<endl;
+            //cout << "erorr here" <<endl;
         } else if(return_pid == Jobs[i].process_ID){
 
             Jobs.erase(Jobs.begin()+i,Jobs.begin()+i+1);
@@ -154,10 +156,12 @@ void JobsList::removeFinishedJobs() {
 void JobsList::printJobsList() {
     removeFinishedJobs();
     for(JobEntry j : Jobs){
+        if(j.st == FOREGROUND)
+            continue;
         cout<<"["<<j.jobID<<"] "<<j.cmd->getCmdLine()<<" : "<<j.process_ID<<" "<<difftime(time(nullptr),j.entryTime)<<" secs";
         if(j.st == STOPPED)
             cout<<" (stopped)"<<endl;
-        else
+        else if(j.st == BACKGROUND)
             cout<<endl;
     }
 }
@@ -198,7 +202,19 @@ JobEntry * JobsList::getLastStoppedJob() {
     }
     return nullptr;
 }
-bool isValidNumber(string arg, bool negative = false){
+
+bool isValidNumber(string arg){
+    int start = arg[0] == '-' ? 1 : 0;
+    if(start && arg.size() == 1)
+        return false;
+    for(unsigned int i = start; i < arg.size(); i++){
+        if(arg[i] < '0' || arg[i] > '9')
+            return false;
+    }
+    return true;
+}
+
+bool isValidSignedNumber(string arg, bool negative = false){
     if(negative){
         if(arg[0] != '-' )
             return false;
@@ -214,7 +230,7 @@ bool isValidNumber(string arg, bool negative = false){
     return true;
 }
 void KillCommand::execute() {
-    if(arguments.size() != 3 || !isValidNumber(arguments[1],true)){
+    if(arguments.size() != 3 || !isValidSignedNumber(arguments[1], true)){
         cout<< "smash error: kill: invalid arguments"<<endl;
         return;
     }
@@ -280,7 +296,8 @@ void ForegroundCommand::execute() {
         kill(job->process_ID,SIGCONT);
         smash.currForegroundPID = job->process_ID;
         smash.currCmd = job->cmd;
-        smash.getJobs().removeJobById(job->jobID);
+        smash.getJobs().getJobById(job->jobID)->st = FOREGROUND;
+        //smash.getJobs().removeJobById(job->jobID);
 
         waitpid(currPid ,&status,WUNTRACED);
     }else if(arguments.size() == 1){
@@ -293,7 +310,7 @@ void ForegroundCommand::execute() {
         //job = smash.getJobs().getLastStoppedJob();
         job = smash.getJobs().getLastJob();
 
-
+        job->st = FOREGROUND;
 
         cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
 
@@ -304,7 +321,7 @@ void ForegroundCommand::execute() {
         smash.currForegroundPID = job->process_ID;
         smash.currCmd = job->cmd;
 
-        smash.getJobs().removeJobById(job->jobID);
+        //smash.getJobs().removeJobById(job->jobID);
 
         waitpid(currPid ,&status,WUNTRACED);
 
@@ -322,8 +339,8 @@ void BackgroundCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     smash.getJobs().removeFinishedJobs();
     JobEntry* job = smash.getJobs().getJobById(jobID);
-    if(!job){
-        cout<<"smash error: fg: job-id "<<jobID<<" does not exist"<<endl;
+    if(!job && arguments.size() > 1){
+        cout<<"smash error: bg: job-id "<<jobID<<" does not exist"<<endl;
         return;
     }
     if(arguments.size()>2){
@@ -337,15 +354,17 @@ void BackgroundCommand::execute() {
         }
         
         kill(job->process_ID,SIGCONT);
+        job->st = BACKGROUND;
         cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
-    }else if(arguments.size() == 1){
+    }else if(arguments.size() == 1) {
         job = smash.getJobs().getLastStoppedJob();
-        if(!job){
-            cout<<"smash error: bg: there is no stopped job to resume"<<endl;
+        if (!job) {
+            cout << "smash error: bg: there is no stopped job to resume" << endl;
             return;
         }
-        kill(job->process_ID,SIGCONT);
-        cout<<job->cmd->print_cmd()<<" : "<<job->process_ID<<endl;
+        kill(job->process_ID, SIGCONT);
+        job->st = BACKGROUND;
+        cout << job->cmd->print_cmd() << " : " << job->process_ID << endl;
     }
     job->st = BACKGROUND;
 }
@@ -359,7 +378,7 @@ void HeadCommand::execute() {
         cout<<"smash error: head: invalid arguments"<<endl;
         return;
     }
-    if(arguments.size() == 3 && !isValidNumber(arguments[1],true)){
+    if(arguments.size() == 3 && !isValidSignedNumber(arguments[1], true)){
         cout<<"smash error: head: invalid arguments"<<endl;
         return;
     }
@@ -388,10 +407,12 @@ void QuitCommand::execute() {
     JobsList jobs = smash.getJobs();
     if(arguments.size() >=2){
         if(arguments[1] == "kill"){
-            cout<< "smash: sending SIGKILL signal to "<< jobs.Jobs.size()<<" jobs:"<<endl;
+            cout<< "smash: sending SIGKILL signal to "<< jobs.getRealJobsSize()<<" jobs:"<<endl;
             for (unsigned int i = 0; i <jobs.Jobs.size() ; ++i) {
-                cout<<jobs.Jobs[i].process_ID<<": "<<jobs.Jobs[i].cmd->print_cmd()<<endl;
-                kill(jobs.Jobs[i].process_ID,SIGKILL);
+                if(jobs.Jobs[i].st == STOPPED || jobs.Jobs[i].st == BACKGROUND) {
+                    cout << jobs.Jobs[i].process_ID << ": " << jobs.Jobs[i].cmd->print_cmd() << endl;
+                    kill(jobs.Jobs[i].process_ID, SIGKILL);
+                }
             }
             smash.alive = false;
         }else{
@@ -486,22 +507,31 @@ void PipeCommand::execute() {
         close(myPipe[0]); // closing the writing channel
         close(1);
         dup2(myPipe[1],operation == PIPE ? 1 : 2);
-        smash.executeCommand(firstCommand.c_str());
+        firstCmd = new char(firstCommand.size());
+        strcpy(firstCmd, firstCommand.c_str());
+        smash.executeCommand(firstCmd);
         exit(1);
     } else {
         //parent
+        waitpid(pid, NULL, WSTOPPED);
         close(myPipe[1]); //closing the reading channel
         close(0);
         dup2(myPipe[0], 0);
-        smash.executeCommand(secondCommand.c_str());
+        secondCmd = new char(secondCommand.size());
+        strcpy(secondCmd, secondCommand.c_str());
+        smash.executeCommand(secondCmd);
+        //exit(1);
     }
+    if(pid) {
+        close(myPipe[0]);
+        close(myPipe[1]);
 
-    close(myPipe[0]);
-    close(myPipe[1]);
-
-    dup2(stdInCopy, 0);
-    dup2(stdOutCopy, 1);
-    dup2(stdErrCopy, 2);
+        dup2(stdInCopy, 0);
+        dup2(stdOutCopy, 1);
+        dup2(stdErrCopy, 2);
+    } else {
+        exit(0);
+    }
 }
 
 
@@ -544,6 +574,7 @@ void RedirectionCommand::execute() {
         cmd += " ";
         index++;
     }
+
     smash.executeCommand(cmd.c_str());
 
     close(fd);
@@ -617,7 +648,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     // For example:
     //cmd_s command without spaces
     string cmd_s = _trim(string(cmd_line));
-    string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n\0&"));
+    string firstWord = cmd_s.substr(0, cmd_s.find_first_of("& \n"));
     int special = checkSpecial( cmd_line);
     if(special == 1 || special == 2){
         return new RedirectionCommand(cmd_line,special);

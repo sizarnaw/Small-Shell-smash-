@@ -51,17 +51,15 @@ public:
 
 class ExternalCommand : public Command {
 public:
-    const char* cmd;
+    char* cmd;
     bool BG;
-    char**  arr_arg;
-    ExternalCommand(const char* cmd_line ,bool isBG): Command(cmd_line),cmd(cmd_line),BG(isBG),arr_arg((char**)malloc(arguments.size())){
-        //arr_arg = (char**)malloc(arguments.size());
-        for (unsigned int i = 0; i < arguments.size(); ++i) {
-            arr_arg[i] = (char*)malloc(arguments[i].size());
-            strcpy(arr_arg[i],arguments[i].c_str());
-        }
+    ExternalCommand(const char* cmd_line ,bool isBG): Command(cmd_line),BG(isBG){
+        cmd = new char (strlen(cmd_line));
+        strcpy(cmd, cmd_line);
     }
-     ~ExternalCommand()=default;
+     ~ExternalCommand() {
+        delete cmd;
+    };
     void execute() override;
 };
 
@@ -69,12 +67,15 @@ class PipeCommand : public Command {
     // TODO: Add your data members
     enum op {PIPE, PIPEERROR};
     op operation;
-    const char* cmd_line;
+    char* firstCmd,* secondCmd;
 public:
-    PipeCommand(const char* cmd_line, int op) : Command(cmd_line), cmd_line(cmd_line){
+    PipeCommand(const char* cmd_line, int op) : Command(cmd_line){
         operation = op == 3 ? PIPE : PIPEERROR;
     }
-    virtual ~PipeCommand() {}
+    virtual ~PipeCommand() {
+        delete firstCmd;
+        delete secondCmd;
+    }
     void execute() override;
 };
 
@@ -82,9 +83,9 @@ class RedirectionCommand : public Command {
     // TODO: Add your data members
     enum op{APPEND,OVERRIDE};
     op operation;
-    const char* cmd_line;
 public:
-     RedirectionCommand(const char* cmd_line, int op): Command(cmd_line),cmd_line(cmd_line){
+     RedirectionCommand(const char* cmd_line, int op): Command(cmd_line)
+     {
          operation = op == 1 ? OVERRIDE : APPEND;
     }
      ~RedirectionCommand()= default;
@@ -137,7 +138,7 @@ public:
      ~QuitCommand()=default;
     void execute() override;
 };
-enum status{STOPPED,BACKGROUND};
+enum status{STOPPED,BACKGROUND, FOREGROUND};
 class JobEntry {
 public: // TODO: Add your data members
     int jobID;
@@ -171,13 +172,21 @@ public:
 public:
     JobsList() = default;
     ~JobsList() = default;
-    void addJob(Command* cmd,pid_t pid ,status isStopped=STOPPED);
+    void addJob(Command* cmd,pid_t pid ,status isStopped);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
     JobEntry * getJobById(int jobId);
     JobEntry* getJobByPID(pid_t pid);
     void removeJobById(int jobId);
+    int getRealJobsSize(){
+        int c = 0;
+        for(JobEntry job : Jobs){
+            if(job.st == BACKGROUND || job.st == STOPPED)
+                c++;
+        }
+        return c;
+    }
     JobEntry * getLastJob(){
         return &Jobs[Jobs.size()-1];
     }
