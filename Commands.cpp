@@ -509,19 +509,34 @@ void RedirectionCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
     int fd;
     if(operation == OVERRIDE) {
-        fd = open(arguments.back().c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+        fd = open(arguments.back().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
     }else{
-        fd = open(arguments.back().c_str(), O_CREAT | O_RDWR |O_APPEND, 0644);
+        fd = open(arguments.back().c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
     }
     if(fd == -1) {
         perror("smash error: open failed");
-        //cout << "ERROR" << endl; //TODO: ERROR HANGLING
         return;
     }
 
     int stdoutcopy = dup(1);
-    close(1);
-    dup2(fd,1);
+    if(stdoutcopy == -1){
+        perror("smash error: dup failed");
+        close(fd);
+        return;
+    }
+    if(close(1) == -1){
+        perror("smash error: close failed");
+        close(stdoutcopy);
+        close(fd);
+        return;
+    }
+    if(dup2(fd,1) == -1){
+        perror("smash error: dup2 failed");
+        dup2(stdoutcopy,1);
+        close(fd);
+        return;
+    }
+
     string cmd;
     int index = 0;
     while(arguments[index] != ">" && arguments[index] != ">>") {
@@ -532,7 +547,13 @@ void RedirectionCommand::execute() {
     smash.executeCommand(cmd.c_str());
 
     close(fd);
-    dup2(stdoutcopy,1);
+    close(1);
+    if(dup2(stdoutcopy,1) == -1){
+        perror("smash error: dup2 failed");
+        return;
+    }
+    close(stdoutcopy);
+
 }
 SmallShell::SmallShell(): jobs() {
 // TODO: add your implementation
